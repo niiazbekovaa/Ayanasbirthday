@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Surprise</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Neucha&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-1:#07040f;
+    --bg-2:#160a24;
+    --accent-red:#ff4d6d;
+    --accent-pink:#ff8fab;
+    --accent-gold:#ffd166;
+    --text-soft:#f4e9f0;
+    --text-dim:#c9b8cf;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{
+    height:100%;
+    background: radial-gradient(ellipse at 50% 20%, var(--bg-2), var(--bg-1) 70%);
+    color: var(--text-soft);
+    font-family: 'Neucha', 'Caveat', cursive;
+    font-size: 20px;
+    overflow:hidden;
+  }
+  #stars{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+  }
+  .screen{
+    position:fixed; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:32px;
+    opacity:0; visibility:hidden;
+    transition: opacity 0.9s ease;
+    z-index:2;
+    overflow-y:auto;
+  }
+  .screen.active{ opacity:1; visibility:visible; z-index:3; }
+
+  h1.title{
+    font-family: 'Caveat', cursive;
+    font-size: clamp(34px, 7vw, 64px);
+    font-weight:700;
+    letter-spacing:0.5px;
+    background: linear-gradient(90deg, var(--accent-pink), var(--accent-gold), var(--accent-red));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    margin-bottom: 28px;
+    text-shadow: 0 0 40px rgba(255,77,109,0.25);
+  }
+  .btn{
+    font-family:inherit;
+    font-size:18px;
+    padding:14px 34px;
+    border-radius:40px;
+    border:1px solid rgba(255,143,171,0.5);
+    background:rgba(255,77,109,0.12);
+    color:var(--text-soft);
+    cursor:pointer;
+    letter-spacing:0.3px;
+    backdrop-filter: blur(6px);
+    transition: transform 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+    box-shadow: 0 0 0 rgba(255,77,109,0);
+  }
+  .btn:hover{
+    transform: translateY(-3px);
+    background: rgba(255,77,109,0.25);
+    box-shadow: 0 8px 30px rgba(255,77,109,0.35);
+  }
+  .btn:active{ transform: translateY(0); }
+
+  .hint{
+    margin-top:18px;
+    font-size:14px;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  /* Screen 2: congrats text reveal */
+  #congrats-greeting{
+    font-family: 'Caveat', cursive;
+    font-size: clamp(30px, 5vw, 44px);
+    color: var(--accent-pink);
+    margin-bottom: 22px;
+    text-shadow: 0 0 30px rgba(255,77,109,0.3);
+  }
+  #congrats-text{
+    max-width:640px;
+    font-size: clamp(16px, 2.3vw, 20px);
+    line-height:1.8;
+    color: var(--text-soft);
+    padding: 4px 6px;
+  }
+  #congrats-text p{ margin-bottom: 18px; }
+  #congrats-text span{
+    opacity:0;
+    filter: blur(4px);
+    transition: opacity 0.5s ease, filter 0.5s ease;
+  }
+  #congrats-text span.shown{ opacity:1; filter: blur(0); }
+  #congrats-continue{ margin-top: 30px; opacity:0; transition: opacity 0.8s ease; }
+  #congrats-continue.shown{ opacity:1; }
+
+  /* Screen 3: photo slider */
+  .slider-wrap{
+    width:min(90vw, 460px);
+  }
+  .slide{
+    width:100%;
+    aspect-ratio: 4/5;
+    border-radius:18px;
+    background: linear-gradient(160deg, #2a1030, #150818);
+    border:1px solid rgba(255,143,171,0.35);
+    display:flex; align-items:center; justify-content:center;
+    position:relative;
+    overflow:hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .slide img{
+    width:100%; height:100%; object-fit:cover; display:block;
+  }
+  .slide-placeholder{
+    color: var(--text-dim);
+    font-size:15px;
+    padding:20px;
+    text-align:center;
+  }
+  .slide-caption{
+    position:absolute; left:0; right:0; bottom:0;
+    padding:16px 18px 14px;
+    background: linear-gradient(0deg, rgba(0,0,0,0.75), transparent);
+    font-size:15px;
+    text-align:left;
+  }
+  .slider-controls{
+    display:flex; justify-content:space-between; align-items:center;
+    margin-top:16px;
+  }
+  .slider-dots{ display:flex; gap:8px; }
+  .dot{ width:8px; height:8px; border-radius:50%; background: rgba(255,255,255,0.25); transition: background 0.3s; }
+  .dot.active{ background: var(--accent-red); }
+  .nav-btn{
+    background:none; border:1px solid rgba(255,143,171,0.4); color:var(--text-soft);
+    width:38px; height:38px; border-radius:50%; cursor:pointer; font-size:18px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .nav-btn:hover{ background: rgba(255,77,109,0.2); }
+
+  /* Screen 4: heart game */
+  #game-area{
+    position:relative;
+    width:min(92vw, 560px);
+    height:min(60vh, 420px);
+    margin-top:10px;
+  }
+  .heart-target{
+    position:absolute;
+    font-size:34px;
+    cursor:pointer;
+    user-select:none;
+    animation: floaty 3s ease-in-out infinite;
+    transition: transform 0.2s ease, opacity 0.3s ease;
+    filter: drop-shadow(0 0 8px rgba(255,77,109,0.5));
+  }
+  .heart-target.popped{ transform: scale(1.8); opacity:0; }
+  @keyframes floaty{
+    0%,100%{ transform: translateY(0) rotate(0deg); }
+    50%{ transform: translateY(-12px) rotate(6deg); }
+  }
+  #game-progress{ margin-top: 14px; color: var(--text-dim); font-size:15px; }
+
+  /* Final screen */
+  #final-tease{ font-size: clamp(18px,3vw,24px); margin-bottom: 10px; }
+  #final-open-btn{ margin-top:26px; opacity:0; transition: opacity 0.8s ease; }
+  #final-open-btn.shown{ opacity:1; }
+
+  #question-block{ display:none; }
+  #question-block.shown{ display:flex; flex-direction:column; align-items:center; }
+  .question-text{ font-size: clamp(20px,3.2vw,28px); margin-bottom:30px; max-width:600px; }
+  .answer-row{
+    display:flex; gap:22px; position:relative; height:70px; align-items:center; justify-content:center;
+    width:100%;
+  }
+  #think-btn{ position:relative; transition: none; }
+
+  #result-block{ display:none; margin-top:34px; max-width:520px; }
+  #result-block.shown{ display:block; }
+  #meeting-line{ font-size: clamp(18px,2.8vw,22px); margin-bottom:22px; }
+  #countdown{
+    display:flex; gap:18px; justify-content:center; margin-top:10px;
+  }
+  .cd-unit{ text-align:center; min-width:64px; }
+  .cd-num{ font-size:28px; font-weight:700; color: var(--accent-gold); }
+  .cd-label{ font-size:12px; color: var(--text-dim); letter-spacing:1px; text-transform:uppercase; }
+
+  /* letter envelope */
+  #envelope-wrap{ margin-top:26px; cursor:pointer; }
+  .envelope{
+    width:120px; height:80px; position:relative; margin: 0 auto;
+  }
+  .env-body{
+    position:absolute; inset:0; background: linear-gradient(160deg,#3a1424,#220b16);
+    border-radius:6px; border:1px solid rgba(255,143,171,0.4);
+  }
+  .env-flap{
+    position:absolute; top:0; left:0; width:100%; height:50%;
+    background: linear-gradient(160deg,#4a1a30,#2a0f1c);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    transform-origin: top;
+    transition: transform 0.6s ease;
+    border-radius: 6px 6px 0 0;
+  }
+  #envelope-wrap.open .env-flap{ transform: rotateX(160deg); }
+
+  #letter-content{
+    max-width:480px;
+    margin: 24px auto 0;
+    padding:22px 26px;
+    border-radius:14px;
+    background: linear-gradient(160deg, rgba(58,20,36,0.55), rgba(20,8,16,0.55));
+    border:1px solid rgba(255,143,171,0.35);
+    font-size: clamp(15px,2.2vw,17px);
+    line-height:1.7;
+    text-align:left;
+    opacity:0;
+    transform: translateY(-10px);
+    max-height:0;
+    overflow:hidden;
+    transition: opacity 0.7s ease, transform 0.7s ease, max-height 0.7s ease, padding 0.7s ease, margin 0.7s ease;
+  }
+  #letter-content.shown{
+    opacity:1;
+    transform: translateY(0);
+    max-height:400px;
+  }
+
+  audio{ display:none; }
+
+  #music-toggle{
+    position:fixed; top:18px; right:18px; z-index:10;
+    width:44px; height:44px; border-radius:50%;
+    background: rgba(255,255,255,0.06); border:1px solid rgba(255,143,171,0.4);
+    color:var(--text-soft); font-size:18px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="stars"></canvas>
+<button id="music-toggle" title="Музыка">🔈</button>
+
+<!-- Замените src осы жерде өз әуеніңізге -->
+<audio id="bg-music" loop>
+  <source src="music.mp3" type="audio/mpeg">
+</audio>
+
+<!-- Screen 1: Welcome -->
+<section class="screen active" id="screen-1">
+  <h1 class="title">Happy birthday Ayana! ❤️</h1>
+  <button class="btn" onclick="startExperience()">Нажми сюда ✨</button>
+</section>
+
+<!-- Screen 2: Congrats -->
+<section class="screen" id="screen-2">
+  <div id="congrats-greeting">Аяным❤️</div>
+  <div id="congrats-text"></div>
+  <button class="btn" id="congrats-continue" onclick="goTo(3)">Дальше →</button>
+</section>
+
+<!-- Screen 3: Photos -->
+<section class="screen" id="screen-3">
+  <h1 class="title" style="font-size:clamp(22px,4vw,32px);">momentss 📸</h1>
+  <div class="slider-wrap">
+    <div class="slide" id="slide-view">
+      <img id="slide-img" src="" alt="Фото">
+      <div class="slide-caption" id="slide-caption"></div>
+    </div>
+    <div class="slider-controls">
+      <button class="nav-btn" onclick="prevSlide()">‹</button>
+      <div class="slider-dots" id="slider-dots"></div>
+      <button class="nav-btn" onclick="nextSlide()">›</button>
+    </div>
+  </div>
+  <button class="btn" style="margin-top:34px;" onclick="goTo(4)">Дальше →</button>
+</section>
+
+<!-- Screen 4: Game -->
+<section class="screen" id="screen-4">
+  <h1 class="title" style="font-size:clamp(22px,4vw,32px);">Поймай все сердечки ❤️</h1>
+  <div id="game-area"></div>
+  <div id="game-progress">Нажато: 0 / 8</div>
+</section>
+
+<!-- Screen 5: Final -->
+<section class="screen" id="screen-5">
+  <div id="final-tease-wrap">
+    <div id="final-tease">Но это ещё не всё...</div>
+    <button class="btn" id="final-open-btn" onclick="openSurprise()">Открыть сюрприз 🎁</button>
+  </div>
+
+  <div id="question-block">
+    <div class="question-text">Я хочу провести этот день вместе с тобой.<br>Пойдёшь со мной...? </div>
+    <div class="answer-row">
+      <button class="btn" onclick="sayYes()"> Конечно!</button>
+      <button class="btn" id="think-btn"> Подумать...</button>
+    </div>
+  </div>
+
+  <div id="result-block">
+    <div id="meeting-line">Ура! Значит, встречаемся в 30.07 в 00:00 — жду тебя с нетерпением!</div>
+    <div id="countdown"></div>
+    <div id="envelope-wrap">
+      <div class="envelope">
+        <div class="env-body"></div>
+        <div class="env-flap"></div>
+      </div>
+      <div class="hint">Нажми на конверт 💌</div>
+    </div>
+    <div id="letter-content">
+      18 жас, жаңа универ, жаңа орта, жаңа өмір… сенің болашағыңды болжай алмаймын бірақ сенің қолыңнан бәрі келетініне қатты сенемін❤️ Сенің ата-анаң, бауырларың өте керемет жандар, себебі сендей қызды өмірге әкеліп, тәрбиеледі. Ата-анаңа көптен көп рахмет🙂‍↕️❤️<br>
+      Сен мен үшін жай ғана құрбы емессің сол үшін сенің өмір жолыңда тек қана жақсы адамдардың болғанын қалаймын. Жаныңда тек адал достар, сенімді орта, әдемі сен қалағандай өмір болуына тілектеспін жаным себебі сен тек жақсылыққа лайықсың💕<br>
+      Біз армандаған болашаққа бірге жетейікші жаным🤍 Тек бір дүниені ұмытпа Аянам: я всегда рядом и всегда буду тебя поддерживать❤️
+    </div>
+  </div>
+</section>
+
+<script>
+/* ---------- Stars background ---------- */
+const canvas = document.getElementById('stars');
+const ctx = canvas.getContext('2d');
+let stars = [];
+function resize(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+function initStars(){
+  stars = [];
+  const count = Math.floor((canvas.width * canvas.height) / 9000);
+  for(let i=0;i<count;i++){
+    stars.push({
+      x: Math.random()*canvas.width,
+      y: Math.random()*canvas.height,
+      r: Math.random()*1.4 + 0.3,
+      a: Math.random(),
+      speed: Math.random()*0.02 + 0.005
+    });
+  }
+}
+function drawStars(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(const s of stars){
+    s.a += s.speed;
+    const alpha = (Math.sin(s.a)+1)/2 * 0.8 + 0.2;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(255,235,245,${alpha})`;
+    ctx.fill();
+  }
+  requestAnimationFrame(drawStars);
+}
+window.addEventListener('resize', ()=>{ resize(); initStars(); });
+resize(); initStars(); drawStars();
+
+/* ---------- Screen navigation ---------- */
+function startExperience(){
+  music.play().then(()=>{
+    musicPlaying = true;
+    musicBtn.textContent = '🔊';
+  }).catch(()=>{});
+  goTo(2);
+}
+function goTo(n){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+n).classList.add('active');
+  if(n===2) startCongrats();
+  if(n===3) initSlider();
+  if(n===4) startGame();
+  if(n===5) startFinalTease();
+}
+
+let finalTeaseStarted = false;
+function startFinalTease(){
+  if(finalTeaseStarted) return;
+  finalTeaseStarted = true;
+  setTimeout(()=>{
+    document.getElementById('final-open-btn').classList.add('shown');
+  }, 3000);
+}
+
+/* ---------- Screen 2: congrats reveal ---------- */
+const congratsParagraphs = [
+  "Саған қанша алғыс айтсам да, ішімдегі сезімді толық жеткізе алмайтын сияқтымын. Сен мен үшін жай ғана дос емессің. Сен – қиын сәтте жанымнан табылатын, қуанышымды шын жүректен бөлісетін, мені ешқашан жалғыз қалдырмайтын ең жақын адамсың.",
+  "Сенімен танысқалы өмірім бұрынғыдан да әдемі бола түсті. Сенің арқаңда шынайы достықтың, адалдықтың және қамқорлықтың не екенін түсіндім. Мені әрдайым қолдап, ақтап, кім не десе де жанымнан табылғаның үшін саған шексіз ризамын.",
+  "Мен сені өте қатты жақсы көремін. Сенің өмірің әрдайым бақытқа, күлкіге, берекеге толы болсын. Армандарың орындалып, әр күнің қуаныш сыйласын. Біз қандай жағдай болса да бір-біріміздің жанымыздан табылып, осы достығымызды өмір бойы сақталғанын қалаймын❤️"
+];
+let congratsStarted = false;
+function startCongrats(){
+  if(congratsStarted) return;
+  congratsStarted = true;
+  const container = document.getElementById('congrats-text');
+  const spans = [];
+  congratsParagraphs.forEach(paragraph=>{
+    const p = document.createElement('p');
+    paragraph.split(' ').forEach(w=>{
+      const span = document.createElement('span');
+      span.textContent = w + ' ';
+      p.appendChild(span);
+      spans.push(span);
+    });
+    container.appendChild(p);
+  });
+  spans.forEach((span, i)=>{
+    setTimeout(()=> span.classList.add('shown'), i*45);
+  });
+  setTimeout(()=>{
+    document.getElementById('congrats-continue').classList.add('shown');
+  }, spans.length*45 + 500);
+}
+
+/* ---------- Screen 3: slider ---------- */
+const slides = [
+  {src: "photo1.jpg", caption: "Это ты ✨"},
+  {src: "photo2.jpg", caption: "Всегда рядом, всегда вместе 💕"},
+  {src: "photo3.jpg", caption: "Ещё одно тёплое воспоминание 🌙"}
+];
+let currentSlide = 0;
+let sliderInit = false;
+function initSlider(){
+  if(sliderInit) return;
+  sliderInit = true;
+  const dotsWrap = document.getElementById('slider-dots');
+  slides.forEach((_, i)=>{
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (i===0 ? ' active' : '');
+    dotsWrap.appendChild(dot);
+  });
+  renderSlide();
+}
+function renderSlide(){
+  document.getElementById('slide-img').src = slides[currentSlide].src;
+  document.getElementById('slide-caption').textContent = slides[currentSlide].caption;
+  document.querySelectorAll('.dot').forEach((d,i)=> d.classList.toggle('active', i===currentSlide));
+}
+function nextSlide(){ currentSlide = (currentSlide+1) % slides.length; renderSlide(); }
+function prevSlide(){ currentSlide = (currentSlide-1+slides.length) % slides.length; renderSlide(); }
+
+/* ---------- Screen 4: heart game ---------- */
+let gameStarted = false;
+let poppedCount = 0;
+const TOTAL_HEARTS = 8;
+function startGame(){
+  if(gameStarted) return;
+  gameStarted = true;
+  const area = document.getElementById('game-area');
+  for(let i=0;i<TOTAL_HEARTS;i++){
+    const heart = document.createElement('div');
+    heart.className = 'heart-target';
+    heart.textContent = '❤️';
+    heart.style.left = Math.random()*85 + '%';
+    heart.style.top = Math.random()*85 + '%';
+    heart.style.animationDelay = (Math.random()*2)+'s';
+    heart.addEventListener('click', ()=>{
+      if(heart.classList.contains('popped')) return;
+      heart.classList.add('popped');
+      poppedCount++;
+      document.getElementById('game-progress').textContent = `Нажато: ${poppedCount} / ${TOTAL_HEARTS}`;
+      if(poppedCount === TOTAL_HEARTS){
+        setTimeout(()=> goTo(5), 700);
+      }
+    });
+    area.appendChild(heart);
+  }
+}
+
+/* ---------- Screen 5: final ---------- */
+function openSurprise(){
+  document.getElementById('final-tease-wrap').style.display = 'none';
+  document.getElementById('question-block').classList.add('shown');
+  launchConfetti();
+}
+
+/* Escaping "думать" button */
+const thinkBtn = document.getElementById('think-btn');
+thinkBtn.addEventListener('mouseenter', escapeButton);
+thinkBtn.addEventListener('touchstart', escapeButton, {passive:true});
+function escapeButton(){
+  const wrap = thinkBtn.parentElement.getBoundingClientRect();
+  const btnW = thinkBtn.offsetWidth;
+  const btnH = thinkBtn.offsetHeight;
+  const maxX = window.innerWidth - btnW - 20;
+  const maxY = window.innerHeight - btnH - 20;
+  const x = Math.random()*maxX;
+  const y = Math.random()*maxY;
+  thinkBtn.style.position = 'fixed';
+  thinkBtn.style.left = x+'px';
+  thinkBtn.style.top = y+'px';
+}
+
+function sayYes(){
+  document.getElementById('question-block').classList.remove('shown');
+  document.getElementById('result-block').classList.add('shown');
+  launchConfetti();
+  startCountdown();
+}
+
+/* Countdown to 30.07.2026 00:00 (Almaty time) */
+function startCountdown(){
+  const target = new Date("2026-07-30T00:00:00+05:00").getTime();
+  const el = document.getElementById('countdown');
+  function render(){
+    const now = Date.now();
+    let diff = Math.max(0, target - now);
+    const d = Math.floor(diff/(1000*60*60*24));
+    const h = Math.floor((diff/(1000*60*60))%24);
+    const m = Math.floor((diff/(1000*60))%60);
+    const s = Math.floor((diff/1000)%60);
+    el.innerHTML = `
+      <div class="cd-unit"><div class="cd-num">${d}</div><div class="cd-label">дней</div></div>
+      <div class="cd-unit"><div class="cd-num">${h}</div><div class="cd-label">часов</div></div>
+      <div class="cd-unit"><div class="cd-num">${m}</div><div class="cd-label">минут</div></div>
+      <div class="cd-unit"><div class="cd-num">${s}</div><div class="cd-label">секунд</div></div>
+    `;
+    if(diff>0) requestAnimationFrame(render);
+  }
+  render();
+}
+
+/* Envelope */
+const envelope = document.getElementById('envelope-wrap');
+envelope.addEventListener('click', ()=>{
+  envelope.classList.toggle('open');
+  document.getElementById('letter-content').classList.toggle('shown');
+});
+
+/* Confetti */
+function launchConfetti(){
+  const c = document.createElement('canvas');
+  c.style.position = 'fixed'; c.style.inset = '0'; c.style.zIndex = '20'; c.style.pointerEvents='none';
+  c.width = window.innerWidth; c.height = window.innerHeight;
+  document.body.appendChild(c);
+  const cctx = c.getContext('2d');
+  const colors = ['#ff4d6d','#ff8fab','#ffd166','#ffffff'];
+  let particles = [];
+  for(let i=0;i<140;i++){
+    particles.push({
+      x: Math.random()*c.width,
+      y: -20 - Math.random()*c.height*0.5,
+      r: Math.random()*6+3,
+      color: colors[Math.floor(Math.random()*colors.length)],
+      vy: Math.random()*3+2,
+      vx: (Math.random()-0.5)*2,
+      rot: Math.random()*360,
+      vrot: (Math.random()-0.5)*10
+    });
+  }
+  let frame = 0;
+  function tick(){
+    frame++;
+    cctx.clearRect(0,0,c.width,c.height);
+    particles.forEach(p=>{
+      p.y += p.vy; p.x += p.vx; p.rot += p.vrot;
+      cctx.save();
+      cctx.translate(p.x,p.y);
+      cctx.rotate(p.rot*Math.PI/180);
+      cctx.fillStyle = p.color;
+      cctx.fillRect(-p.r/2,-p.r/2,p.r,p.r);
+      cctx.restore();
+    });
+    if(frame < 220){
+      requestAnimationFrame(tick);
+    } else {
+      c.remove();
+    }
+  }
+  tick();
+}
+
+/* Music toggle */
+const music = document.getElementById('bg-music');
+const musicBtn = document.getElementById('music-toggle');
+let musicPlaying = false;
+musicBtn.addEventListener('click', ()=>{
+  if(musicPlaying){
+    music.pause();
+    musicBtn.textContent = '🔈';
+  } else {
+    music.play().catch(()=>{});
+    musicBtn.textContent = '🔊';
+  }
+  musicPlaying = !musicPlaying;
+});
+</script>
+
+</body>
+</html>
